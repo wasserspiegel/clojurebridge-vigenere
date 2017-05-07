@@ -86,7 +86,7 @@ whcmxtczwsewshlusotvyvciutepwjdvskjijapqywmcjzpkdpdayjtlwsxqkh
 ttwspalgzgwgfakwzxhtceshyietonggsmjhsmopdxghepmbzckajiopclwsep
 wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 
-
+(def about "
 ;; not sure if that is the best way but here is the plan
 ;; we want a matrix
 ;;   a b c d <-cipher char for pos
@@ -104,6 +104,7 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 ;; take as many as it takes to crack the message
 ;;
 ;; cljs gui with plots 
+")
 
 (def transpose (partial apply mapv vector))
 
