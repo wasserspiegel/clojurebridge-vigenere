@@ -1,4 +1,4 @@
-(ns clojurebridge-cipher-crack.vinegre
+(ns clojurebridge-cipher-crack.vigenere
   (:require [clojure.string]
             [clojure.set]))
 
@@ -99,11 +99,11 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 ;;
 ;; plot as img
 ;; 
-;; get geom average for each positional candidate
+;; get average for each positional candidate
 ;;
 ;; make a lazy list that chooses the next cipher candidate by lowest score
 ;; 
-;; take as many as it takes to crack the message
+;; take first to crack the message
 ;;
 ;; cljs gui with plots 
 ")
@@ -149,7 +149,9 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 
 ;; get  average for each positional candidate
 ;;
-(defn keys-and-avg 
+(defn keys-and-avg
+  "return a sorted list of average scores with key [[c 2.1] [e 5.4] ..] 
+    for every possible cipher at a position (sum over columns)"
   [mat]
   (let [sum (mapv #(apply + %) (transpose mat))
         abc  (mapv identity alphabeth)]
@@ -159,7 +161,7 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 ;; make a lazy list that chooses the next cipher candidate by lowest score
 ;; 
 (defn candidates
-  "cls cipher-lengths return a list"
+  "cls cipher-lengths return a sorted list"
   [cls s]
   (sort-by :best-cipher-score < 
    (vec (for [cl cls] 
@@ -181,5 +183,13 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
 ;; (candidates (range 2 9) encr3)          
 
 ;; take as many as it takes to crack the message
+;; skip (one is enough) for a reasonably long message
 ;;
 ;; cljs gui with plots 
+;; see core.cljs
+
+(def default-message "Put your message here. All spaces and non-letters will be stripped. Characters are lowercased, before en/decrypting. 
+You probably need a message of at least one thousand characters to crack a message with a cipher of length 5 or more. The background (letter frequencies) are for English only; you will have to change the source if you want to crack a message in another language. 
+By default the cracking page will take the message from below (encrypted) to save you cut & paste. The scoring function does not always compare different cipher lengths well, but the result is usually in the top 5.  
+Vertical green lines in the heat map are good candidates, they are nicely visible if you use the cipher cljs on this message and try to crack it. Horizontal green/blue lines indicate a more random distribution (3.85%). 
+If you delete this last sentence with the default settings, you should see that the correct cipher is no longer the first result, because the message is too short. ")

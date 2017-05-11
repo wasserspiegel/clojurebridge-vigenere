@@ -17,3 +17,5 @@ pom.xml.asc
 /.sass-cache
 *.DS_Store
 .nrepl-history
+~
+/static

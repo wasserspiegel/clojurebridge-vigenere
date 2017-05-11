@@ -3,7 +3,7 @@
               [reagent.session :as session]
               [secretary.core :as secretary :include-macros true]
               [accountant.core :as accountant]
-              [clojurebridge_cipher_crack.vinegre :as v]
+              [clojurebridge_cipher_crack.vigenere :as v]
               [goog.string :as gstring]
               [goog.string.format]
               [goog.events :as events])
@@ -14,7 +14,7 @@
   (apply gstring/format fmt args))
 
 ;; state
-(defonce ui-state (reagent/atom {:message "Put your message here. All spaces and non-letters will be stripped. Charakters lowercased, before en/decrypting. You probably need a message of at least thousend charakters to crack a message with a cipher of lenght 5 or more. The background (letter frequencies) are for english only, you will have to change the source if you want to crack a message in another langugage. By default the cracking page will take the message plain if decrypt is selected or encryted if the encrypt option is selected. Enjoy.Put your message here. All spaces and non-letters will be stripped. Charakters lowercased, before en/decrypting. You probably need a message of at least thousend charakters to crack a message with a cipher of lenght 5 or more. The background (letter frequencies) are for english only, you will have to change the source if you want to crack a message in another langugage. By default the cracking page will take the message from below (encrypted) to save you cut&paste. The scoring function does not always compare different cipher lengths well." :cipher "clojurebridge" :encrypt true :cr-cl "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"}))
+(defonce ui-state (reagent/atom {:message v/default-message :cipher "clojurebridge" :encrypt true :cr-cl "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"}))
 
 ;; event functions
 (defn nrange [s] (mapv js/Number. (clojure.string/split s #"\s")))
@@ -28,54 +28,71 @@
                                          (v/strip-non-alpha (get @ui-state :encr)))))
 (defn ui-state-updater [path]  (fn [ev] (swap! ui-state assoc-in path (.-value (.-target ev)))))
 (defn ui-state-toggle  [path]  (swap! ui-state update-in path not))
-(defn ^:export draw [id mdata]
+
+
+
+(defn mat2img-data 
+  "turn var matrix into heatmap image data
+     except for the typed array as we have to mutate the array provided by react 
+     otherwise it will be replaced
+   we are interested in the range 0-2"
+  [mat]
+  (let [flat (vec (flatten mat))
+        midpoint 8
+  ;      r    (fn [x] (- (* sc sc x) 255))
+  ;      g    (fn [x] (- 255 (* sc sc x)))
+  ;      b    (fn [x] (+ (r x) (g x)))
+        ;; xd   (fn [x] (- 16 (* sc x)))
+        ;; b    (fn [x] (- (* (xd x) (xd x)) 255))
+        is   (range (count flat))]
+  ;; [red green blue alpha]
+  ; red -256(1-x)^3
+  ; green 256(1-x)^3
+  ; blue 255-256(1-x)^2
+  (vec (flatten (for [i is] 
+                  (let [x  (get flat i)
+                        emx  (/ (- midpoint x) midpoint)
+                        emx2 (* emx emx)
+                        scemx3 (* 256 emx emx2)
+                        r (- scemx3)
+                        g scemx3
+                        b (- 255 (* 256 emx2))]
+                        [r g b 255])
+                  )))
+))
+
+(defn ^:export draw 
+  "gets called just after the empty heatmap images are created in dom to fill the data"
+  [id mat]
   (let [cnv (.getElementById js/document id)
         ctx (.getContext cnv "2d")
         img-data (.getImageData ctx 0 0 26 26)
-        data (.-data img-data)]
-    (.log js/console  (str "draw:  " id " head: arg.data:" (take 10 mdata)))
+        data (.-data img-data)
+        mdata (mat2img-data mat)]
+  ;; (.log js/console  (str "draw:  " id " head: arg.data:" (take 10 mdata)))
   (doall (for [i (range 2704)] (aset data i (js/Number (get mdata i)))))
   (.putImageData ctx img-data 0 0)
-  (.log js/console  (str "draw:  " id " head image.data: " (aget data 0) (aget data 1) (aget data 2) (aget data 3)   ))))
+  ;; (.log js/console  (str "draw:  " id " head image.data: " (aget data 0) (aget data 1) (aget data 2) (aget data 3)))   
+  ))
   
 
 (defn analyze [] (swap! ui-state assoc-in [:candidates]
                         (v/candidates (nrange (get @ui-state :cr-cl)) (get @ui-state :encr))))
-;(u/candidates [3 4 5] (get @ui-state :encr))))
 
-(defn mat2img-data [m]
- (let [ flat (flatten (first m))
-        scaled (mapv #(* 10) flat)
-        zero (map #(* 0 %) flat)
-        image-data (interleave scaled zero zero)]
-  image-data
-))
 
-;; components
-;; (defn imats [id mats]
-;;   (let [mid (str "mat-" id)
-;;         flat (flatten (first mats))
-;;         zero (map #(* 0 %) flat)
-;;         image-data (interleave flat zero zero)]
-;;   [:canvas {:id mid :width "26" :height "26" :after-render #(draw mid image-data)}]
-;; ))
-
-(defn ^:export imats [id mat]
-  (let [mid (str "mat-" id)
-        flat (flatten mat)
-        sc   10.0
-        sc-r (mapv #(- (* sc %) 320) flat)
-        sc-g (mapv #(- 255 (* sc %)) flat)
-        n    (count flat)
-        zero (vec (repeat n 0))
-        fill (vec (repeat n 255))
-        image-data (vec (interleave sc-r sc-g zero fill))]
+;; reagent components
+(defn ^:export imats 
+  "create heatmap images"
+  [id mat]
+  (let [mid (str "mat-" id) ]
     (reagent/create-class
-     {:component-did-mount #(draw mid image-data)
+     {:component-did-mount #(draw mid mat)
       :reagent-render (fn [] [:canvas {:id mid :width "26" :height "26"} ] ) })
 ))
 
-(defn ^:export result-component [cands]
+(defn ^:export result-component 
+  "display a table of the results, the first result is sufficient for this demo"
+  [cands]
   [:table.pure-table
    [:thead
     [:tr 
@@ -125,7 +142,7 @@
                       :on-change (ui-state-updater [:cr-cl])}]
              ]
             [:div
-             [:button {:on-click (fn [ev] (analyze))} "analyse"]]
+             [:button {:on-click (fn [ev] (analyze))} "analyze"]]
             ]]
       [:div
        [:h3 "result:"]
@@ -141,7 +158,7 @@
              [:label "Message to encrypt (or decrypted message)"]
  [:br]
              [:textarea {:cols 80
-                      :rows 12
+                      :rows 14
                       :value (get state :message)
                       :on-change (ui-state-updater [:message])}]
             [:div
@@ -185,7 +202,7 @@
      [:div.header 
       [:h3 "Encrypt or decrypt a message with vinagre cipher"]
        [:ul.pure-menu-horizontal
-        [:li.pure-menu-list [:a {:href (crack-path)} "take a try cracking a vinagre encrypted message"]]
+        [:li.pure-menu-list [:a {:href (crack-path)} "take a try cracking a Vigenere encrypted message"]]
         [:li.pure-menu-separator ]
         [:li.pure-menu-list  [:a {:href (about-path)} "go to about page"]]]
 
@@ -199,9 +216,9 @@
   (let [state @ui-state]
     [:div#main
      [:div.header 
-      [:h3 "vinegre-cipher: comparing letter frequencies to a reference for english"]
+      [:h3 "Vigenere-cipher: comparing letter frequencies to a reference for english"]
       [:ul.pure-menu-horizontal
-        [:li.pure-menu-list [:a {:href (index-path)} "en/decrypt a message with vinegre"]
+        [:li.pure-menu-list [:a {:href (index-path)} "en/decrypt a message with Vigenere"]
         [:li.pure-menu-separator ]
         [:li.pure-menu-list  [:a {:href (about-path)} "go to about page"]]]]
       [:div.content
@@ -243,6 +260,8 @@
                    (fn [event]
                      (secretary/dispatch! (.-token event))))
     (.setEnabled history true))
+
+  ;; Accountant interferes with secretarys # prefix which allows it to be deployed to a filesystem
 
   ;; (accountant/configure-navigation!
     ;; {:nav-handler

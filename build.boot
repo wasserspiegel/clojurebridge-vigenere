@@ -82,7 +82,9 @@
 (deftask dirac-dev []
          (comp (watch) (speak :theme "woodblock")
                (cljs-devtools) (dirac)
-               (cljs)
+               (cljs :compiler-options {:optimizations   :none
+                                    :parallel-build  true
+                                    :source-map      true} )
                (target)
                (serve :port 3003)
                ))
