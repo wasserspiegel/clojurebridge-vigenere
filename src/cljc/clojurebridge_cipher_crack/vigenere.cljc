@@ -4,14 +4,15 @@
 
 ;; https://github.com/clojurebridge-boston/track2-ciphers/blob/master/docs/track2-vigenere.md
 
-(def alphabeth "abcdefghijklmnopqrstuvwxyz")
+(def alphabet "abcdefghijklmnopqrstuvwxyz")
+(def a-len (count alphabet))
 
 (def cipher "helloworld")
 
 (def text "Part 3: Vigenere challenge Here is an example for you to try to break. The key is between two and eight characters long. It is a word and is related to the topic of this workshop. Be patient, this may take time. Try to automate you process as much as possible. We also recommend that you work in pairs.")
 
 (defn strip-non-alpha [s]
-  (apply str (re-seq #"[a-z]" (clojure.string/lower-case s)))
+  (apply str (re-seq #"[a-z ]" (clojure.string/lower-case s)))
 )
 
 (defn e-map 
@@ -19,8 +20,8 @@
     [s]
   (vec (for [c s] 
     (apply hash-map (interleave 
-               (mapv identity alphabeth) 
-               (vec (take 26 (drop-while #(not= c %) (cycle alphabeth))))
+               (mapv identity alphabet) 
+               (vec (take a-len (drop-while #(not= c %) (cycle alphabet))))
                ))))
 )
 
@@ -45,7 +46,7 @@
 ;; now to the cracking part
 
 ;; complete decrypt map for the alphabeth that we will use for each position to do freq plots and analysis
-(def c-map (d-map alphabeth)) 
+(def c-map (d-map alphabet)) 
 
 ;; frequencies for english lang 
 (def eng {
@@ -132,14 +133,14 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
   "in: rf ref-freqs, s string-for-a-pos"
   [rf s]
    (let [l (count s)
-         is (range (count alphabeth))
+         is (range (count alphabet))
          nu (fn [n] (if (nil? n) 0 n))
          cs (mapv identity s)
          fch (fn [a b] (let [d (- (nu a) (nu b))]  (* d d) ))
          freqs-by-i (vec (for [i is] (frequencies (map #(get (c-map i) %) cs))))
          ] 
    ;  freqs-by-i
-     (for [cy alphabeth] 
+     (for [cy alphabet] 
        (vec (for [x is] (fch (get rf cy) (/ (* 100 (get (get freqs-by-i x) cy)) l))))
      )))
 
@@ -154,7 +155,7 @@ wecmkxomfitidbplsaznxgpmvdxjqecmkxomfimijpnsgqlus"))
     for every possible cipher at a position (sum over columns)"
   [mat]
   (let [sum (mapv #(apply + %) (transpose mat))
-        abc  (mapv identity alphabeth)]
+        abc  (mapv identity alphabet)]
   (sort-by second < (mapv vec (partition 2 (interleave abc sum)
 )))))
 

@@ -4,6 +4,7 @@
               [secretary.core :as secretary :include-macros true]
               [accountant.core :as accountant]
               [clojurebridge_cipher_crack.vigenere :as v]
+              [dirac.runtime :as dirac-rt]
               [goog.string :as gstring]
               [goog.string.format]
               [goog.events :as events])
@@ -31,34 +32,45 @@
 
 
 
-(defn mat2img-data 
+
+
+(def scale1
+  "basic lin scale green, blue, red"
+  (let [mp 8 ;midpoint
+        r    (fn [x] (- (* mp mp (- x mp) 256)))
+        g    (fn [x] (- (* mp mp (- mp x) 256)))
+        b    (fn [x] (- 255 (* mp (- mp x) (- mp x))))
+        a    (fn [_] 255)]
+  [r g b a]
+))
+
+(def  ^:export scale2
+  "input 0.01-200 log ~ -2 - +5
+   mp midpoint
+   sc scale
+   mph midpoint height keeps av.col. above half across the full range"
+  (let [mp 1.8 ;midpoint
+        sc 32
+        mph 128
+        r    (fn [x] (+ mph (* 2 sc (- (.log js/Math x) mp))))
+        g    (fn [x] (- mph (* 2 sc (- (.log js/Math x) mp))))
+        ;b    (fn [_] 0) ; looks almost as good
+        b    (fn [x] (- 256 sc (* sc (- (.log js/Math x) mp) (- (.log js/Math x) mp))))
+        a    (fn [_] 255)]
+  [r g b a]
+))
+
+(defn mat2img-data-fs 
   "turn var matrix into heatmap image data
      except for the typed array as we have to mutate the array provided by react 
      otherwise it will be replaced
-   we are interested in the range 0-2"
+     moved the heatmap scale functions to separate const."
   [mat]
-  (let [flat (vec (flatten mat))
-        midpoint 8
-  ;      r    (fn [x] (- (* sc sc x) 255))
-  ;      g    (fn [x] (- 255 (* sc sc x)))
-  ;      b    (fn [x] (+ (r x) (g x)))
-        ;; xd   (fn [x] (- 16 (* sc x)))
-        ;; b    (fn [x] (- (* (xd x) (xd x)) 255))
-        is   (range (count flat))]
+  (let [is (range (count mat)) ; let's not assume the heatmap is square although it would be fair
+        js (range (count (first mat)))
+        fs   scale2   ]
   ;; [red green blue alpha]
-  ; red -256(1-x)^3
-  ; green 256(1-x)^3
-  ; blue 255-256(1-x)^2
-  (vec (flatten (for [i is] 
-                  (let [x  (get flat i)
-                        emx  (/ (- midpoint x) midpoint)
-                        emx2 (* emx emx)
-                        scemx3 (* 256 emx emx2)
-                        r (- scemx3)
-                        g scemx3
-                        b (- 255 (* 256 emx2))]
-                        [r g b 255])
-                  )))
+  (vec (for [i is j js f fs] (f (get-in mat [i j]))))
 ))
 
 (defn ^:export draw 
@@ -66,14 +78,16 @@
   [id mat]
   (let [cnv (.getElementById js/document id)
         ctx (.getContext cnv "2d")
-        img-data (.getImageData ctx 0 0 26 26)
+        img-data (.getImageData ctx 0 0 a-len a-len)
         data (.-data img-data)
-        mdata (mat2img-data mat)]
-  ;; (.log js/console  (str "draw:  " id " head: arg.data:" (take 10 mdata)))
-  (doall (for [i (range 2704)] (aset data i (js/Number (get mdata i)))))
+        mdata (mat2img-data-fs mat)]
+   ;; (.log js/console  (str "draw:  " id " head: arg.data:" (take 10 mdata)))
+  (doall (for [i (range (* a-len a-len))] (aset data i (js/Number (get mdata i)))))
   (.putImageData ctx img-data 0 0)
-  ;; (.log js/console  (str "draw:  " id " head image.data: " (aget data 0) (aget data 1) (aget data 2) (aget data 3)))   
+   ;; (.log js/console  (str "draw:  " id " head image.data: " (aget data 0) (aget data 1) (aget data 2) (aget data 3)))   
   ))
+
+
   
 
 (defn analyze [] (swap! ui-state assoc-in [:candidates]
@@ -253,6 +267,8 @@
   (reagent/render [current-page] (.getElementById js/document "app")))
 
 (defn ^:export main []
+  (enable-console-print!)
+  (dirac.runtime/install!)
   (secretary/set-config! :prefix "#")
   ;; Attach event listener to history instance.
   (let [history (History.)]
@@ -264,13 +280,13 @@
   ;; Accountant interferes with secretarys # prefix which allows it to be deployed to a filesystem
 
   ;; (accountant/configure-navigation!
-    ;; {:nav-handler
-     ;; (fn [path]
-       ;; (secretary/dispatch! path))
-     ;; :path-exists?
-     ;; (fn [path]
-       ;; (secretary/locate-route path))})
-  ;; (accountant/dispatch-current!)
+     ;; {:nav-handler
+      ;; (fn [path]
+        ;; (secretary/dispatch! path))
+      ;; :path-exists?
+      ;; (fn [path]
+        ;; (secretary/locate-route path))})
+   ;; (accountant/dispatch-current!)
   (mount-root) )
 
 (main)

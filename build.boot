@@ -8,9 +8,9 @@
        :license     {"EPL" "@wasserspiegel"}})
 
 (set-env!
-  :dependencies '[[org.clojure/clojure       "1.8.0"            :scope "provided"]
+  :dependencies '[[org.clojure/clojure       "1.9.0-alpha14"            :scope "provided"]
                   [org.clojure/clojurescript "1.9.521"          :scope "compile"]
-                  ;; [org.clojure/core.async    "0.2.395"]
+                  [org.clojure/core.async    "0.2.395"]
 
                   ;;; database, server & logging ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -23,7 +23,7 @@
 
 
                   ;;; frontend framework  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                  [reagent                          "0.6.1"]
+                  [reagent                          "0.6.2"]
                   [reagent-utils                    "0.2.1"]
                    [secretary "1.2.3"]
                   [venantius/accountant "0.2.0"
@@ -38,8 +38,8 @@
                   [adzerk/boot-cljs-repl     "0.3.3"]
 
                   ;;; cljs repl ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                  [binaryage/dirac           "1.2.7"            :scope "test"]
-                  [binaryage/devtools        "0.9.2"            :scope "test"]
+                  [binaryage/dirac           "1.2.8"            :scope "test"]
+                  [binaryage/devtools        "0.9.4"            :scope "test"]
                   [powerlaces/boot-cljs-devtools "0.2.0"        :scope "test"]
 
 
@@ -47,13 +47,13 @@
                   ]
   :source-paths   #{"src/cljc" "src/cljs"}
   :resource-paths #{"resources"}
-  ;; :asset-paths    #{"assets"}
+  :asset-paths    #{"assets"}
   )
 
 ;;create project file for cursive
-;; (require
-;; '[boot.lein])
-;; (boot.lein/generate)
+(require
+ '[boot.lein])
+(boot.lein/generate)
 
 
 (require
@@ -65,6 +65,16 @@
 
   )
 
+;
+(def devtools-config
+ {:features-to-install           [:formatters :hints :async]
+  :dont-detect-custom-formatters true})
+
+(def dirac-config
+ {:nrepl-config {;reveal-url-script-path "scripts/reveal.sh"
+                 ;reveal-url-request-handler (fn [config url line column]
+                 ;                              (str "ERR REPLY>" url))
+                 }}  )
 
 (deftask dev []
          (comp
@@ -75,7 +85,8 @@
            ;(cljs-repl)
            (cljs :compiler-options {:optimizations   :none
                                     :parallel-build  true
-                                    :source-map      true})
+                                    :source-map      true
+                                    })
            (target)
            (serve :port 3000)))
 
@@ -83,8 +94,13 @@
          (comp (watch) (speak :theme "woodblock")
                (cljs-devtools) (dirac)
                (cljs :compiler-options {:optimizations   :none
-                                    :parallel-build  true
-                                    :source-map      true} )
+                                        :parallel-build  true
+                                        :source-map      true
+                                        :preloads        ["devtools.preload" "dirac.runtime.preload"]
+                                        :main            "chef.core"
+                                        :external-config {:devtools/config devtools-config
+                                                          :dirac.runtime/config dirac-config}
+                     } )
                (target)
                (serve :port 3003)
                ))
